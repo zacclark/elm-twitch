@@ -6,6 +6,8 @@ import Http
 import Json.Decode as Json exposing ( (:=) )
 import Task
 
+import Form
+
 type alias Channel =
   { status : String
   , displayName : String
@@ -20,26 +22,23 @@ type alias Stream =
   , preview : StreamPreview
   }
 
+
 type alias Model =
   { loading : Bool
-  , game : String
   , streams : List Stream
-  , previewChoice : PreviewOption
+  , form : Form.Model
   }
 
-type PreviewOption
-  = None
-  | Small
-  | Medium
-  | Large
-
-init : String -> (Model, Cmd Action)
-init game =
-  (Model False game [] None, getStreams "dota 2")
+init : (Model, Cmd Action)
+init =
+  let
+    form = Form.init
+  in
+    (Model False [] form, getStreams form.game)
 
 main =
   Html.program
-    { init = init "dota 2"
+    { init = init
     , view = view
     , update = update
     , subscriptions = subscriptions
@@ -49,49 +48,40 @@ type Action
   = Reload
   | FetchSucceed (List Stream)
   | FetchFail Http.Error
-  | ChangePreview PreviewOption
+  | ChangeForm Form.Msg
 
 subscriptions : Model -> Sub Action
-subscriptions model =
-  Sub.none
+subscriptions model = Sub.none
 
 update : Action -> Model -> (Model, Cmd Action)
 update action model =
   case action of
     Reload ->
       ( { model | loading = True }
-      , getStreams model.game )
+      , getStreams model.form.game )
     FetchSucceed streams ->
       ( { model | streams = streams, loading = False }
       , Cmd.none )
     FetchFail err ->
       ( { model | loading = False }
       , Cmd.none )
-    ChangePreview choice ->
-      ( { model | previewChoice = choice }
+    ChangeForm formMsg ->
+      ( { model | form = (Form.update formMsg model.form) }
       , Cmd.none )
+
+previewUrl : Model -> Stream -> Maybe String
+previewUrl model stream =
+  case model.form.previewOption of
+    Form.None -> Nothing
+    Form.Small -> Just stream.preview.small
+    Form.Medium -> Just stream.preview.medium
+    Form.Large -> Just stream.preview.large
 
 previewHtml : Model -> Stream -> Html Action
 previewHtml model stream =
-  case model.previewChoice of
-    None ->
-      div [] []
-    Small ->
-      img [src stream.preview.small] []
-    Medium ->
-      img [src stream.preview.medium] []
-    Large ->
-      img [src stream.preview.large] []
-
-radio : PreviewOption -> String -> Model -> Html Action
-radio choice name model =
-  let
-    isSelected = model.previewChoice == choice
-  in
-    label []
-      [ input [ type' "radio", checked isSelected, onCheck (\_ -> ChangePreview choice) ] []
-      , text name
-      ]
+  case previewUrl model stream of
+    Nothing -> div [] []
+    Just url -> img [src url] []
 
 loadingState : Model -> String
 loadingState model =
@@ -106,20 +96,17 @@ view model =
     fancyMakeRow : Stream -> Html Action
     fancyMakeRow stream =
       tr [] [ td [] [ previewHtml model stream ]
-            , td [] [text stream.channel.displayName]
-            , td [] [text stream.channel.status]
+            , td [] [ text stream.channel.displayName ]
+            , td [] [ text stream.channel.status ]
             ]
     rows = List.map fancyMakeRow <| model.streams
   in
     div []
-      [ h1 [] [ text model.game
+      [ h1 [] [ text model.form.game
               , button [ onClick Reload ] [ text "Reload" ]
               ]
       , p [] [ text ("Loading State: " ++ (loadingState model)) ]
-      , radio None "None" model
-      , radio Small "Small" model
-      , radio Medium "Medium" model
-      , radio Large "Large" model
+      , (Html.map ChangeForm (Form.view model.form))
       , table [] rows
       ]
 
