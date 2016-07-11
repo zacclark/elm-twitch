@@ -1,5 +1,5 @@
 module Games exposing
-  ( Model, init
+  ( Model, init, allGames
   , view
   , update, Msg(SelectGame) )
 
