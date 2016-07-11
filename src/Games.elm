@@ -30,10 +30,14 @@ init game =
 
 allGames : Model -> (List String)
 allGames model =
-  if List.member model.selectedGame model.possibleGames then
-    model.possibleGames
-  else
-    [model.selectedGame] ++ model.possibleGames
+  let
+    lowerGame = String.toLower model.selectedGame
+    lowerGames = model.possibleGames |> List.map String.toLower
+  in
+    if List.member lowerGame lowerGames then
+      model.possibleGames
+    else
+      [model.selectedGame] ++ model.possibleGames
 
 
 -- UPDATE
