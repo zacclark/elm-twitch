@@ -48,18 +48,11 @@ update action model =
     GamesChange gamesMsg ->
       let
         (newGames, newCmd) = Games.update gamesMsg model.games
-        mappedCmd = Cmd.map GamesChange newCmd
+        gamesCmd = Cmd.map GamesChange newCmd
 
-        potentialCmd = case gamesMsg of
-          Games.SelectGame game ->
-            Cmd.map
-              StreamsChange
-              (snd <| Streams.update (Streams.ChangeGame game) model.streams)
-          _ ->
-            Cmd.none
+        (model, cmd) = propogateGameChange gamesMsg model
       in
-        ( { model | games = newGames }
-        , Cmd.batch [ mappedCmd, potentialCmd ] )
+        { model | games = newGames } ! [ gamesCmd, cmd ]
 
     StreamsChange streamsMsg ->
       let
@@ -67,6 +60,17 @@ update action model =
       in
         ( { model | streams = newStreams }
         , Cmd.map StreamsChange newCmd )
+
+
+propogateGameChange : Games.Msg -> Model -> (Model, Cmd Msg)
+propogateGameChange gamesMsg model =
+  case gamesMsg of
+    Games.SelectGame game ->
+      update (StreamsChange (Streams.ChangeGame game)) model
+
+    _ ->
+      (model, Cmd.none)
+
 
 view : Model -> Html Msg
 view model =
