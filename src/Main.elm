@@ -6,35 +6,19 @@ import Http
 import Json.Decode as Json exposing ( (:=) )
 import Task
 
-import Form
-
-type alias Channel =
-  { status : String
-  , displayName : String
-  }
-type alias StreamPreview =
-  { small : String
-  , medium : String
-  , large : String
-  }
-type alias Stream =
-  { channel : Channel
-  , preview : StreamPreview
-  }
-
+import Streams
 
 type alias Model =
-  { loading : Bool
-  , streams : List Stream
-  , form : Form.Model
+  { streams : Streams.Model
   }
 
-init : (Model, Cmd Action)
+init : (Model, Cmd Msg)
 init =
   let
-    form = Form.init
+    (streams, streamCmd) = Streams.init "dota 2"
   in
-    (Model False [] form, getStreams form.game)
+    ( Model streams
+    , Cmd.batch [ Cmd.map StreamsChange streamCmd ] )
 
 main =
   Html.program
@@ -44,99 +28,24 @@ main =
     , subscriptions = subscriptions
     }
 
-type Action
-  = Reload
-  | FetchSucceed (List Stream)
-  | FetchFail Http.Error
-  | ChangeForm Form.Msg
+type Msg
+  = StreamsChange Streams.Msg
 
-subscriptions : Model -> Sub Action
+subscriptions : Model -> Sub Msg
 subscriptions model = Sub.none
 
-update : Action -> Model -> (Model, Cmd Action)
+update : Msg -> Model -> (Model, Cmd Msg)
 update action model =
   case action of
-    Reload ->
-      ( { model | loading = True }
-      , getStreams model.form.game )
-    FetchSucceed streams ->
-      ( { model | streams = streams, loading = False }
-      , Cmd.none )
-    FetchFail err ->
-      ( { model | loading = False }
-      , Cmd.none )
-    ChangeForm formMsg ->
-      ( { model | form = (Form.update formMsg model.form) }
-      , Cmd.none )
+    StreamsChange streamsMsg ->
+      let
+        (newStreams, newCmd) = Streams.update streamsMsg model.streams
+      in
+        ( { model | streams = newStreams }
+        , Cmd.map StreamsChange newCmd )
 
-previewUrl : Model -> Stream -> Maybe String
-previewUrl model stream =
-  case model.form.previewOption of
-    Form.None -> Nothing
-    Form.Small -> Just stream.preview.small
-    Form.Medium -> Just stream.preview.medium
-    Form.Large -> Just stream.preview.large
-
-previewHtml : Model -> Stream -> Html Action
-previewHtml model stream =
-  case previewUrl model stream of
-    Nothing -> div [] []
-    Just url -> img [src url] []
-
-loadingState : Model -> String
-loadingState model =
-  if model.loading then
-    "Loading..."
-  else
-    "Done"
-
-view : Model -> Html Action
+view : Model -> Html Msg
 view model =
-  let
-    fancyMakeRow : Stream -> Html Action
-    fancyMakeRow stream =
-      tr [] [ td [] [ previewHtml model stream ]
-            , td [] [ text stream.channel.displayName ]
-            , td [] [ text stream.channel.status ]
-            ]
-    rows = List.map fancyMakeRow <| model.streams
-  in
-    div []
-      [ h1 [] [ text model.form.game
-              , button [ onClick Reload ] [ text "Reload" ]
-              ]
-      , p [] [ text ("Loading State: " ++ (loadingState model)) ]
-      , (Html.map ChangeForm (Form.view model.form))
-      , table [] rows
-      ]
-
-getStreams : String -> Cmd Action
-getStreams game =
-  let
-    url = Http.url "https://api.twitch.tv/kraken/streams" [ ("game", game)
-                                                          , ("language", "en") ]
-  in
-    Task.perform FetchFail FetchSucceed (Http.get streamsDecoder url)
-
-channelDecoder : Json.Decoder Channel
-channelDecoder =
-  Json.object2 Channel
-    ("status" := Json.string)
-    ("display_name" := Json.string)
-
-streamDecoder : Json.Decoder Stream
-streamDecoder =
-  Json.object2 Stream
-    ("channel" := channelDecoder)
-    ("preview" := previewDecoder)
-
-previewDecoder : Json.Decoder StreamPreview
-previewDecoder =
-  Json.object3 StreamPreview
-    ("small" := Json.string)
-    ("medium" := Json.string)
-    ("large" := Json.string)
-
-streamsDecoder : Json.Decoder (List Stream)
-streamsDecoder =
-  ("streams" := Json.list streamDecoder)
+  div []
+    [ Html.map StreamsChange (Streams.view model.streams)
+    ]
