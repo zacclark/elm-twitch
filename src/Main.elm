@@ -1,4 +1,4 @@
-import Html exposing (div, table, td, text, Html, tr, h1, img, label, input, button, p)
+import Html exposing (Html, div, hr)
 import Html.App as Html
 import Html.Attributes exposing (src, type', checked)
 import Html.Events exposing (onCheck, onClick)
@@ -6,19 +6,26 @@ import Http
 import Json.Decode as Json exposing ( (:=) )
 import Task
 
+import Games
 import Streams
 
 type alias Model =
-  { streams : Streams.Model
+  { games : Games.Model
+  , streams : Streams.Model
   }
 
 init : (Model, Cmd Msg)
 init =
   let
-    (streams, streamCmd) = Streams.init "dota 2"
+    game = "dota 2"
+    (games, gamesCmd) = Games.init game
+    (streams, streamCmd) = Streams.init game
   in
-    ( Model streams
-    , Cmd.batch [ Cmd.map StreamsChange streamCmd ] )
+    ( Model games streams
+    , Cmd.batch
+        [ Cmd.map GamesChange gamesCmd
+        , Cmd.map StreamsChange streamCmd ]
+    )
 
 main =
   Html.program
@@ -29,7 +36,8 @@ main =
     }
 
 type Msg
-  = StreamsChange Streams.Msg
+  = GamesChange Games.Msg
+  | StreamsChange Streams.Msg
 
 subscriptions : Model -> Sub Msg
 subscriptions model = Sub.none
@@ -37,6 +45,13 @@ subscriptions model = Sub.none
 update : Msg -> Model -> (Model, Cmd Msg)
 update action model =
   case action of
+    GamesChange gamesMsg ->
+      let
+        (newGames, newCmd) = Games.update gamesMsg model.games
+      in
+        ( { model | games = newGames }
+        , Cmd.map GamesChange newCmd )
+
     StreamsChange streamsMsg ->
       let
         (newStreams, newCmd) = Streams.update streamsMsg model.streams
@@ -47,5 +62,7 @@ update action model =
 view : Model -> Html Msg
 view model =
   div []
-    [ Html.map StreamsChange (Streams.view model.streams)
+    [ Html.map GamesChange (Games.view model.games)
+    , hr [] []
+    , Html.map StreamsChange (Streams.view model.streams)
     ]
