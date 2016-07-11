@@ -48,9 +48,18 @@ update action model =
     GamesChange gamesMsg ->
       let
         (newGames, newCmd) = Games.update gamesMsg model.games
+        mappedCmd = Cmd.map GamesChange newCmd
+
+        potentialCmd = case gamesMsg of
+          Games.SelectGame game ->
+            Cmd.map
+              StreamsChange
+              (snd <| Streams.update (Streams.ChangeGame game) model.streams)
+          _ ->
+            Cmd.none
       in
         ( { model | games = newGames }
-        , Cmd.map GamesChange newCmd )
+        , Cmd.batch [ mappedCmd, potentialCmd ] )
 
     StreamsChange streamsMsg ->
       let

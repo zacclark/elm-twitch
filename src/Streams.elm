@@ -1,7 +1,7 @@
 module Streams exposing
   ( Model, init
   , view
-  , update, Msg )
+  , update, Msg(ChangeGame) )
 
 import Html exposing (div, table, td, text, Html, tr, h1, img)
 import Html.App as Html
@@ -43,6 +43,7 @@ init game =
 type Msg
   = FetchSucceed (List Stream)
   | FetchFail Http.Error
+  | ChangeGame String
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -54,6 +55,9 @@ update msg model =
     FetchFail err ->
       ( model
       , Cmd.none )
+    ChangeGame game ->
+      ( { model | game = game }
+      , getStreams game )
 
 
 -- VIEW

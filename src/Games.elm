@@ -6,6 +6,7 @@ module Games exposing
 import Html exposing (Html, div, p, text, select, option)
 import Html.App as Html
 import Html.Attributes exposing (selected)
+import Html.Events
 import Http
 import Json.Decode as Json exposing ( (:=) )
 import Task
@@ -63,10 +64,16 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-  div []
-    [ select []
-        (model |> allGames |> List.map (gameOption model.selectedGame))
-    ]
+  let
+    onSelect : (String -> msg) -> Html.Attribute msg
+    onSelect tagger = Html.Events.on
+      "change"
+      (Json.map tagger Html.Events.targetValue)
+  in
+    div []
+      [ select [ onSelect SelectGame ]
+          (model |> allGames |> List.map (gameOption model.selectedGame))
+      ]
 
 
 gameOption : String -> String -> Html Msg
